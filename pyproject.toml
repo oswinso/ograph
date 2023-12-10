@@ -1,5 +1,5 @@
 [project]
-name = "og"
+name = "ograph"
 authors = [
     {name = "Oswin So", email = "oswinso@gmail.com"},
 ]

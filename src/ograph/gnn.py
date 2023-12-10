@@ -56,8 +56,8 @@ class GNNUpdate(NamedTuple):
         nI_recv = graph.n_nodefeat[:, None, :]
 
         # message passing.
-        vmap_message = jax.vmap(jax.vmap(self.message, in_axes=(0, None, 0)), in_axes=(0, 0, None))
-        nn_edgefeat = vmap_message(nn_edgefeat, In_send, nI_recv)
+        vmap_message = jax.vmap(jax.vmap(self.message, in_axes=(0, 0, None)), in_axes=(0, None, 0))
+        nn_edgefeat = vmap_message(nn_edgefeat, In_send[0, :, :], nI_recv[:, 0, :])
 
         # aggregate messages
         n_aggr_msg = self.aggregate.dense(nn_edgefeat)
@@ -70,29 +70,30 @@ class GNNUpdate(NamedTuple):
 
 class SoftmaxGNN(nn.Module):
     msg_net_cls: Type[nn.Module]
-    aggr_net_cls: Type[nn.Module]
+    gate_feat_cls: Type[nn.Module]
     update_net_cls: Type[nn.Module]
     msg_dim: int
     out_dim: int
-    kernel_init = nn.initializers.xavier_uniform()
 
     @nn.compact
     def __call__(self, graph: AnyGraph) -> AnyGraph:
+        kernel_init = nn.initializers.xavier_uniform
+
         def message(edge: EdgeFeat, sender: NodeFeat, receiver: NodeFeat) -> EdgeFeat:
             feats = jnp.concatenate([edge, sender, receiver], axis=-1)
             feats = self.msg_net_cls()(feats)
-            feats = nn.Dense(self.msg_dim, kernel_init=self.kernel_init)(feats)
+            feats = nn.Dense(self.msg_dim, kernel_init=kernel_init())(feats)
             return feats
 
         def update(n_node: NNodeFeat, n_aggr_msg: NNodeFeat) -> NNodeFeat:
             feats = jnp.concatenate([n_node, n_aggr_msg], axis=-1)
             feats = self.update_net_cls()(feats)
-            feats = nn.Dense(self.out_dim, kernel_init=self.kernel_init)(feats)
+            feats = nn.Dense(self.out_dim, kernel_init=kernel_init())(feats)
             return feats
 
         def get_gate_feats(e_edge: EEdgeFeat) -> EEdgeFeat:
-            e_gate_feats = self.aggr_net_cls()(e_edge)
-            e_gate_feats = nn.Dense(1, kernel_init=self.kernel_init)(e_gate_feats).squeeze(-1)
+            e_gate_feats = self.gate_feat_cls()(e_edge)
+            e_gate_feats = nn.Dense(1, kernel_init=kernel_init())(e_gate_feats).squeeze(-1)
             return e_gate_feats
 
         aggregator = SoftmaxAggregator(get_gate_feats)
