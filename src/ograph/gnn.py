@@ -43,7 +43,7 @@ class GNNUpdate(NamedTuple):
         # update nodes
         n_nodefeat = self.update(graph.n_nodefeat, n_aggr_msg)
 
-        return graph._replace(n_nodefeat=n_nodefeat, e_edgefeat=e_edgefeat)
+        return graph.replace(n_nodefeat=n_nodefeat, e_edgefeat=e_edgefeat)
 
     def run_compl(self, graph: ComplGraph) -> ComplGraph:
         assert graph.is_single
@@ -65,7 +65,7 @@ class GNNUpdate(NamedTuple):
         # update nodes
         n_nodefeat = self.update(graph.n_nodefeat, n_aggr_msg)
 
-        return graph._replace(n_nodefeat=n_nodefeat, nn_edgefeat=nn_edgefeat)
+        return graph.replace(n_nodefeat=n_nodefeat, nn_edgefeat=nn_edgefeat)
 
 
 class SoftmaxGNN(nn.Module):
