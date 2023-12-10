@@ -26,6 +26,7 @@ class Graph(tuple):
         e_sendidx: ENodeIdx,
         e_recvidx: ENodeIdx,
     ) -> "Graph":
+        assert isinstance(num_nodes, int), "num_nodes must be a (concrete) int!"
         tup = (num_nodes, num_edges, n_nodefeat, e_edgefeat, e_sendidx, e_recvidx)
         self = tuple.__new__(cls, tup)
         self.num_nodes = num_nodes
