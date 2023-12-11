@@ -6,6 +6,7 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
+from flax.linen import initializers
 
 from ograph.aggregators import SoftmaxAggregator
 from ograph.graph_types import AnyGraph, ComplGraph, Graph
@@ -68,12 +69,36 @@ class GNNUpdate(NamedTuple):
         return graph.replace(n_nodefeat=n_nodefeat, nn_edgefeat=nn_edgefeat)
 
 
+class GraphNorm(nn.Module):
+    @nn.compact
+    def __call__(self, n_feats: NNodeFeat) -> NNodeFeat:
+        # n_feats: (n_node, dim)
+        n_node, dim = n_feats.shape
+
+        # d_gamma, d_alpha, d_beta are learnable parameters.
+        d_gamma = self.param("gamma", initializers.ones_init(), (dim,), n_feats.dtype)
+        d_alpha = self.param("gamma", initializers.ones_init(), (dim,), n_feats.dtype)
+        d_beta = self.param("gamma", initializers.zeros_init(), (dim,), n_feats.dtype)
+
+        # Compute mean and variance across nodes.
+        d_mean = jnp.mean(n_feats, axis=0)
+        d_var = jnp.var(n_feats, axis=0)
+        d_std = jnp.sqrt(d_var + 1e-5)
+
+        # Normalize.
+        n_feats_normalized = d_gamma * (n_feats - d_alpha * d_mean) / d_std + d_beta
+        assert n_feats_normalized.shpae == n_feats.shape
+
+        return n_feats_normalized
+
+
 class SoftmaxGNN(nn.Module):
     msg_net_cls: Type[nn.Module]
     gate_feat_cls: Type[nn.Module]
     update_net_cls: Type[nn.Module]
     msg_dim: int
     out_dim: int
+    graphnorm: bool = False
 
     @nn.compact
     def __call__(self, graph: AnyGraph) -> AnyGraph:
@@ -86,10 +111,15 @@ class SoftmaxGNN(nn.Module):
             return feats
 
         def update(n_node: NNodeFeat, n_aggr_msg: NNodeFeat) -> NNodeFeat:
-            feats = jnp.concatenate([n_node, n_aggr_msg], axis=-1)
-            feats = self.update_net_cls()(feats)
-            feats = nn.Dense(self.out_dim, kernel_init=kernel_init())(feats)
-            return feats
+            n_feats = jnp.concatenate([n_node, n_aggr_msg], axis=-1)
+
+            if self.graphnorm:
+                # Normalize feats using graphnorm.
+                n_feats = GraphNorm()(n_feats)
+
+            n_feats = self.update_net_cls()(n_feats)
+            n_feats = nn.Dense(self.out_dim, kernel_init=kernel_init())(n_feats)
+            return n_feats
 
         def get_gate_feats(e_edge: EEdgeFeat) -> EEdgeFeat:
             e_gate_feats = self.gate_feat_cls()(e_edge)
