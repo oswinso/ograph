@@ -92,7 +92,7 @@ class ComplGraph(NamedTuple):
 
     @property
     def batch_shape(self):
-        return self.n_nodefeat.shape[:-2]
+        return self.nn_edgefeat.shape[:-3]
 
     @property
     def is_single(self) -> bool:

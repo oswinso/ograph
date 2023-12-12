@@ -5,7 +5,7 @@ from jaxtyping import ArrayLike, Float, Int
 Arr = ArrayLike
 
 EdgeFeat = Float[Arr, "edge_dim"]
-NodeFeat = Float[Arr, "edge_dim"]
+NodeFeat = Float[Arr, "node_dim"]
 NodeIdx = Int[Arr, ""]
 
 EEdgeFeat = Float[Arr, "num_edges edge_dim"]
